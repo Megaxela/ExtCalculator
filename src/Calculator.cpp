@@ -7,51 +7,84 @@
 #include <CalculationException.hpp>
 #include "Calculator.hpp"
 
-void Calculator::setExpression(const std::string& expression)
+Calculator::Calculator() :
+    m_value(),
+    m_functions(),
+    m_expression(),
+    m_variables(),
+    m_braceTest(0)
 {
+
+}
+
+void Calculator::setExpression(std::string expression, bool optimize)
+{
+    m_value = std::move(expression);
     m_expression.clear();
 
     // Splitting on lexems
-    std::vector<Lexem> lexems;
+    LexemStack lexems;
 
-    splitOnLexems(expression, lexems);
-    performValidation(lexems);
+    splitOnLexems(m_value, lexems);
+
     pushLexems(lexems);
+
+    performValidation();
+
+    if (optimize)
+    {
+        performOptimization();
+    }
 }
 
-void Calculator::getRPN(std::vector<Calculator::Lexem>& lexems)
+void Calculator::getRPN(LexemStack& lexems)
 {
     lexems = m_expression;
 }
 
-void Calculator::performValidation(const std::vector<Calculator::Lexem>& lexems)
+void Calculator::performValidation()
 {
-    // Calculating braces
-    int braces = 0;
+    uint32_t values = 0;
 
-    for (auto&& lexem : lexems)
+    Function* func;
+
+    for (auto&& lexem : m_expression)
     {
         switch (lexem.type)
         {
-        case Lexem::Type::BraceOpen:
-            ++braces;
-            break;
-        case Lexem::Type::BraceClosed:
-            --braces;
+        case Lexem::Type::Constant:
+        case Lexem::Type::Variable:
+            values += 1;
             break;
 
+        case Lexem::Type::Function:
+
+            func = std::get<Function*>(lexem.value);
+
+            if (func->numberOfArguments > values)
+            {
+                throw StatementException(
+                    std::string("Not enough arguments for function \"")
+                        .append(func->name)
+                        .append("\"")
+                );
+            }
+
+            values -= func->numberOfArguments - 1;
+
+            break;
         default:
             break;
         }
     }
 
-    if (braces != 0)
+    if (values != 1)
     {
-        throw StatementException("Braces are unbalanced");
+        throw StatementException("Unbalanced statement");
     }
 }
 
-void Calculator::noneState(const char*& string, std::vector<Calculator::Lexem>& lexems, int& state)
+void Calculator::noneState(const char*& string, LexemStack& /* lexems */, int& state)
 {
     if (isdigit(*string) ||
         *string == '.' ||
@@ -75,7 +108,7 @@ void Calculator::noneState(const char*& string, std::vector<Calculator::Lexem>& 
     ++string;
 }
 
-void Calculator::numberState(const char*& string, std::vector<Calculator::Lexem>& lexems, int& state)
+void Calculator::numberState(const char*& string, LexemStack& lexems, int& state)
 {
     auto start = string;
     auto dotFound = false;
@@ -86,7 +119,7 @@ void Calculator::numberState(const char*& string, std::vector<Calculator::Lexem>
         {
             if (dotFound)
             {
-                throw ParsingException("Double dot detected in number.");
+                throw ParsingException("Double dot detected in number");
             }
 
             dotFound = true;
@@ -106,13 +139,16 @@ void Calculator::numberState(const char*& string, std::vector<Calculator::Lexem>
 
             if (((*start == '-' ||
                   *start == '+') &&
-                 (len < 2)))
+                 (len < 2)) ||
+                (!lexems.empty() &&
+                 lexems.back().type != Lexem::Type::BraceOpen &&
+                 lexems.back().type != Lexem::Type::Function &&
+                 lexems.back().type != Lexem::Type::Comma))
             {
                 string = start;
-                state = 2; // String
+                state = 2; // String/Function/Variable
                 return;
             }
-
 
             double value;
 
@@ -122,7 +158,7 @@ void Calculator::numberState(const char*& string, std::vector<Calculator::Lexem>
             }
             catch (std::invalid_argument& argument)
             {
-                throw ParsingException(std::string(start, len) + " is not a number.");
+                throw ParsingException(std::string(start, len) + " is not a number");
             }
 
             lexems.emplace_back(
@@ -143,6 +179,19 @@ void Calculator::numberState(const char*& string, std::vector<Calculator::Lexem>
         // Finish
         auto len = std::distance(start, string);
 
+        if (((*start == '-' ||
+              *start == '+') &&
+             (len < 2)) ||
+            (!lexems.empty() &&
+             lexems.back().type != Lexem::Type::BraceOpen &&
+             lexems.back().type != Lexem::Type::Function &&
+             lexems.back().type != Lexem::Type::Comma))
+        {
+            string = start;
+            state = 2; // String/Function/Variable
+            return;
+        }
+
         double value;
 
         try
@@ -151,7 +200,7 @@ void Calculator::numberState(const char*& string, std::vector<Calculator::Lexem>
         }
         catch (std::invalid_argument& argument)
         {
-            throw ParsingException(std::string(start, len) + " is not a number.");
+            throw ParsingException(std::string(start, len) + " is not a number");
         }
 
         lexems.emplace_back(
@@ -204,8 +253,10 @@ Calculator::SymbolType Calculator::getSymbolType(char c)
     return SymbolType::Garbage;
 }
 
-void Calculator::stringState(const char*& string, std::vector<Calculator::Lexem>& lexems, int& state)
+void Calculator::stringState(const char*& string, LexemStack& lexems, int& state)
 {
+    Lexem lexem;
+
     auto start = string;
 
     // Detecting symbol type
@@ -216,10 +267,32 @@ void Calculator::stringState(const char*& string, std::vector<Calculator::Lexem>
         throw ParsingException("Garbage in variable/function name");
     }
 
+    if (symbolType == SymbolType::Decimal)
+    {
+        throw ParsingException("Variable or function can't start with number");
+    }
+
+    if (symbolType == SymbolType::Special &&
+        *string == ',')
+    {
+        lexem.type = Lexem::Type::Comma;
+
+        lexems.emplace_back(lexem);
+
+        state = 0;
+
+        ++string;
+
+        return;
+    }
+
     while (*string &&
            (symbolType == getSymbolType(*string) ||
                (symbolType == SymbolType::Alphabetic &&
-                getSymbolType(*string) == SymbolType::Decimal)))
+                getSymbolType(*string) == SymbolType::Decimal) ||
+               (symbolType == SymbolType::Alphabetic &&
+                getSymbolType(*string) == SymbolType::Special &&
+                *string == '_')))
     {
         ++string;
     }
@@ -229,20 +302,18 @@ void Calculator::stringState(const char*& string, std::vector<Calculator::Lexem>
     // If there is some strange error.
     if (size == 0)
     {
-        throw ParsingException("Internal error.");
+        throw ParsingException("Internal error");
     }
 
     std::string_view name(start, static_cast<std::string::size_type>(size));
 
     bool found = false;
 
-    Lexem lexem;
-
-    for (auto&& [key, value] : m_functions)
+    for (auto&& key : m_functions)
     {
-        if (key == name)
+        if (key.first == name)
         {
-            lexem.value = &m_functions[key];
+            lexem.value = &m_functions[key.first];
             lexem.type = Lexem::Type::Function;
 
             found = true;
@@ -266,29 +337,37 @@ void Calculator::stringState(const char*& string, std::vector<Calculator::Lexem>
     state = 0; // None state
 }
 
-void Calculator::quoteState(const char*& string, std::vector<Calculator::Lexem>& lexems, int& state)
+void Calculator::braceState(const char*& string, LexemStack& lexems, int& state)
 {
     if (*string == '(')
     {
         lexems.emplace_back(Calculator::Lexem(Calculator::Lexem::Type::BraceOpen));
         ++string;
+
+        ++m_braceTest;
     }
     else if (*string == ')')
     {
         lexems.emplace_back(Calculator::Lexem(Calculator::Lexem::Type::BraceClosed));
         ++string;
+
+        --m_braceTest;
     }
     else
     {
-        throw ParsingException(std::string("Unknown brace ") + *string + " found.");
+        throw ParsingException(
+            std::string("Unknown brace \"")
+                .append(string, 1)
+                .append("\" found")
+        );
     }
 
     state = 0;
 }
 
-void Calculator::splitOnLexems(const std::string& string, std::vector<Calculator::Lexem>& lexems)
+void Calculator::splitOnLexems(const std::string& string, LexemStack& lexems)
 {
-    using LexemParserState = std::function<void(const char*&, std::vector<Calculator::Lexem>&, int&)>;
+    using LexemParserState = std::function<void(const char*&, LexemStack&, int&)>;
 
     // 0 - none state.
     // 1 - parsing number
@@ -296,16 +375,17 @@ void Calculator::splitOnLexems(const std::string& string, std::vector<Calculator
     // 3 - quote
 
     LexemParserState states[] = {
-        std::bind(&Calculator::noneState, this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3),
+        std::bind(&Calculator::noneState,   this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3),
         std::bind(&Calculator::numberState, this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3),
         std::bind(&Calculator::stringState, this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3),
-        std::bind(&Calculator::quoteState, this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3)
+        std::bind(&Calculator::braceState,  this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3)
     };
 
     auto state = 0;
 
     auto s = string.c_str();
 
+    m_braceTest = 0;
     while (*s)
     {
         int newState = -1;
@@ -317,6 +397,11 @@ void Calculator::splitOnLexems(const std::string& string, std::vector<Calculator
             state = newState;
         }
     }
+
+    if (m_braceTest)
+    {
+        throw StatementException("Unbalanced braces");
+    }
 }
 
 void Calculator::addFunction(Calculator::Function func)
@@ -324,13 +409,11 @@ void Calculator::addFunction(Calculator::Function func)
     m_functions[func.name] = std::move(func);
 }
 
-void Calculator::pushLexems(std::vector<Calculator::Lexem>& lexems)
+void Calculator::pushLexems(LexemStack& lexems)
 {
     m_expression.clear();
 
     LexemStack stack;
-
-    int step = 0;
 
     for (auto&& lexem : lexems)
     {
@@ -344,36 +427,39 @@ void Calculator::pushLexems(std::vector<Calculator::Lexem>& lexems)
             break;
         case Lexem::Type::Function:
             if (!stack.empty() &&
-                stack.top().type != Lexem::Type::BraceOpen &&
-                std::get<Function*>(lexem.value)->priority <= std::get<Function*>(stack.top().value)->priority)
+                stack.back().type != Lexem::Type::BraceOpen &&
+                std::get<Function*>(lexem.value)->priority <= std::get<Function*>(stack.back().value)->priority)
             {
-                m_expression.emplace_back(std::move(stack.top()));
-                stack.pop();
+                m_expression.emplace_back(std::move(stack.back()));
+                stack.pop_back();
             }
 
-            stack.emplace(std::move(lexem));
+            stack.emplace_back(std::move(lexem));
 
             break;
         case Lexem::Type::BraceOpen:
-            stack.push(std::move(lexem));
+            stack.push_back(std::move(lexem));
             break;
         case Lexem::Type::BraceClosed:
-            while (stack.top().type != Lexem::Type::BraceOpen)
+            while (stack.back().type != Lexem::Type::BraceOpen)
             {
-                m_expression.emplace_back(std::move(stack.top()));
-                stack.pop();
+                m_expression.emplace_back(std::move(stack.back()));
+                stack.pop_back();
             }
 
-            stack.pop();
+            stack.pop_back();
 
+            break;
+
+        default:
             break;
         }
     }
 
     while (!stack.empty())
     {
-        m_expression.emplace_back(std::move(stack.top()));
-        stack.pop();
+        m_expression.emplace_back(std::move(stack.back()));
+        stack.pop_back();
     }
 }
 
@@ -398,6 +484,62 @@ void Calculator::deleteVariable(std::string_view name)
     m_variables.erase(name);
 }
 
+void Calculator::performOptimization()
+{
+    LexemStack stack;
+
+    uint32_t args = 0;
+    bool constants = true;
+    Function* func = nullptr;
+
+    for (auto&& lexem : m_expression)
+    {
+        switch (lexem.type)
+        {
+        case Lexem::Type::Constant:
+        case Lexem::Type::Variable:
+            stack.push_back(lexem);
+            break;
+            
+        case Lexem::Type::Function:
+            func = std::get<Function*>(lexem.value);
+            args = func->numberOfArguments;
+
+            constants = true;
+
+            for (uint32_t i = 0; i < args; ++i)
+            {
+                if (stack[stack.size() - i - 1].type != Lexem::Type::Constant)
+                {
+                    constants = false;
+                    break;
+                }
+            }
+
+            if (constants)
+            {
+                stack.emplace_back(
+                    Lexem(
+                        Lexem::Type::Constant,
+                        func->function(stack)
+                    )
+                );
+            }
+            else
+            {
+                stack.push_back(lexem);
+            }
+
+            break;
+            
+        default:
+            break;
+        }
+    }
+
+    m_expression = std::move(stack);
+}
+
 double Calculator::execute()
 {
     auto variableValue = m_variables.end();
@@ -409,7 +551,7 @@ double Calculator::execute()
         switch (lexem.type)
         {
         case Lexem::Type::Constant:
-            stack.push(lexem);
+            stack.push_back(lexem);
             break;
         case Lexem::Type::Variable:
             variableValue = m_variables.find(std::get<std::string_view>(lexem.value));
@@ -417,14 +559,13 @@ double Calculator::execute()
             if (variableValue == m_variables.end())
             {
                 throw CalculationException(
-                    std::string("No variable \"").append(
-                        std::get<std::string_view>(lexem.value).data(),
-                        std::get<std::string_view>(lexem.value).size()
-                    ).append("\" defined.")
+                    std::string("No variable \"")
+                        .append(std::get<std::string_view>(lexem.value))
+                        .append("\" defined")
                 );
             }
 
-            stack.push(
+            stack.push_back(
                 Lexem(
                     Lexem::Type::Constant,
                     variableValue->second
@@ -434,7 +575,7 @@ double Calculator::execute()
             break;
 
         case Lexem::Type::Function:
-            stack.push(
+            stack.push_back(
                 Lexem(
                     Lexem::Type::Constant,
                     std::get<Function*>(lexem.value)->function(stack)
@@ -443,16 +584,16 @@ double Calculator::execute()
             break;
 
         default:
-            throw StatementException("Unexpected lexem detected.");
+            throw StatementException("Unexpected lexem detected");
         }
     }
 
     if (stack.size() != 1) // Result
     {
-        throw StatementException("Unbalanced expression.");
+        throw StatementException("Unbalanced expression");
     }
 
-    return std::get<double>(stack.top().value);
+    return std::get<double>(stack.back().value);
 }
 
 void Calculator::addBasicFunctions()
@@ -460,20 +601,20 @@ void Calculator::addBasicFunctions()
     addFunction(
         Calculator::Function(
             "+",
-            Calculator::Function::Type::Binary,
+            2, // Binary function. Undefined number of args
             1,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto rightValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto rightValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 if (stack.empty())
                 {
                     return rightValue;
                 }
 
-                auto leftValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto leftValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return leftValue + rightValue;
             }
@@ -483,15 +624,15 @@ void Calculator::addBasicFunctions()
     addFunction(
         Calculator::Function(
             "-",
-            Calculator::Function::Type::Binary,
+            2, // Binary function. Undefined number of args
             1,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto rightValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto rightValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
-                auto leftValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto leftValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return leftValue - rightValue;
             }
@@ -501,15 +642,15 @@ void Calculator::addBasicFunctions()
     addFunction(
         Calculator::Function(
             "*",
-            Calculator::Function::Type::Binary,
+            2, // Binary function. Undefined number of args
             2,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto rightValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto rightValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
-                auto leftValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto leftValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return leftValue * rightValue;
             }
@@ -519,15 +660,15 @@ void Calculator::addBasicFunctions()
     addFunction(
         Calculator::Function(
             "/",
-            Calculator::Function::Type::Binary,
+            2, // Binary function. Undefined number of args
             2,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto rightValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto rightValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
-                auto leftValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto leftValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return leftValue / rightValue;
             }
@@ -537,15 +678,15 @@ void Calculator::addBasicFunctions()
     addFunction(
         Calculator::Function(
             "^",
-            Calculator::Function::Type::Binary,
+            2, // Binary function. Undefined number of args
             3,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto rightValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto rightValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
-                auto leftValue = std::get<double>(stack.top().value);
-                stack.pop();
+                auto leftValue = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return std::pow(leftValue, rightValue);
             }
@@ -554,13 +695,28 @@ void Calculator::addBasicFunctions()
 
     addFunction(
         Calculator::Function(
+            "!",
+            1, // Binary function. Undefined number of args
+            3,
+            [](Calculator::LexemStack& stack) -> double
+            {
+                auto value = std::get<double>(stack.back().value);
+                stack.pop_back();
+
+                return std::tgamma(value + 1);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
             "sin",
-            Calculator::Function::Type::Function,
+            1, // One arg
             4,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto value = std::get<double>(stack.top().value);
-                stack.pop();
+                auto value = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return std::sin(value);
             }
@@ -570,12 +726,12 @@ void Calculator::addBasicFunctions()
     addFunction(
         Calculator::Function(
             "cos",
-            Calculator::Function::Type::Function,
+            1, // One arg
             4,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto value = std::get<double>(stack.top().value);
-                stack.pop();
+                auto value = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return std::cos(value);
             }
@@ -585,15 +741,15 @@ void Calculator::addBasicFunctions()
     addFunction(
         Calculator::Function(
             "atan2",
-            Calculator::Function::Type::Function,
+            2, // Two args
             4,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto value2 = std::get<double>(stack.top().value);
-                stack.pop();
+                auto value2 = std::get<double>(stack.back().value);
+                stack.pop_back();
 
-                auto value1 = std::get<double>(stack.top().value);
-                stack.pop();
+                auto value1 = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return std::atan2(value1, value2);
             }
@@ -603,15 +759,50 @@ void Calculator::addBasicFunctions()
     addFunction(
         Calculator::Function(
             "exp",
-            Calculator::Function::Type::Function,
+            1, // One arg
             4,
             [](Calculator::LexemStack& stack) -> double
             {
-                auto value = std::get<double>(stack.top().value);
-                stack.pop();
+                auto value = std::get<double>(stack.back().value);
+                stack.pop_back();
 
                 return std::exp(value);
             }
         )
     );
+}
+
+std::ostream& operator<<(std::ostream& stream, const Calculator::LexemStack& stack)
+{
+    for (auto&& lexem : stack)
+    {
+        switch (lexem.type)
+        {
+        case Calculator::Lexem::Type::Unknown:
+            stream << "???";
+            break;
+        case Calculator::Lexem::Type::Constant:
+            stream << std::get<double>(lexem.value);
+            break;
+        case Calculator::Lexem::Type::Variable:
+            stream << std::get<std::string_view>(lexem.value);
+            break;
+        case Calculator::Lexem::Type::Function:
+            stream << std::get<Calculator::Function*>(lexem.value)->name;
+            break;
+        case Calculator::Lexem::Type::BraceOpen:
+            stream << '(';
+            break;
+        case Calculator::Lexem::Type::BraceClosed:
+            stream << ')';
+            break;
+        case Calculator::Lexem::Type::Comma:
+            stream << ',';
+            break;
+        }
+
+        std::cout << ' ';
+    }
+
+    return stream;
 }

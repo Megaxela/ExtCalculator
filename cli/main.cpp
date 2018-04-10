@@ -1,7 +1,10 @@
 #include <iostream>
+#include <ParsingException.hpp>
+#include <StatementException.hpp>
+#include <CalculationException.hpp>
 #include "Calculator.hpp"
 
-void printLexems(const std::vector<Calculator::Lexem>& lexems)
+void printLexems(const Calculator::LexemStack& lexems)
 {
     for (auto&& lexem : lexems)
     {
@@ -44,7 +47,7 @@ int rpn(int argc, char** argv)
 
     calc.setExpression(argv[0]);
 
-    std::vector<Calculator::Lexem> lexems;
+    Calculator::LexemStack lexems;
     calc.getRPN(lexems);
 
     printLexems(lexems);
@@ -70,6 +73,57 @@ int execute(int argc, char** argv)
     return 0;
 }
 
+int interactive(int argc, char** argv)
+{
+    std::string output;
+
+    std::cout << "Initializing calculator..." << std::endl;
+
+    Calculator calculator;
+    calculator.addBasicFunctions();
+
+    std::cout << "Calculator initialized." << std::endl;
+
+    while (true)
+    {
+        std::cout << '>';
+        std::getline(std::cin, output);
+
+        if (output == "quit")
+        {
+            break;
+        }
+
+        try
+        {
+            calculator.setExpression(output);
+        }
+        catch (ParsingException& e)
+        {
+            std::cout << "Parsing exception: " << e.what() << std::endl << std::endl;
+            continue;
+        }
+        catch (StatementException& e)
+        {
+            std::cout << "Statement exception: " << e.what() << std::endl << std::endl;
+            continue;
+        }
+
+        try
+        {
+            std::cout << calculator.execute() << std::endl << std::endl;
+        }
+        catch (CalculationException& e)
+        {
+            std::cout << "Calculation exception: " << e.what() << std::endl << std::endl;
+        }
+    }
+
+    std::cout << "Calculator closed." << std::endl;
+
+    return 0;
+}
+
 int execute_debug(int argc, char** argv)
 {
     if (argc < 1)
@@ -88,7 +142,8 @@ int execute_debug(int argc, char** argv)
 
 static std::map<std::string_view, std::function<int(int, char**)>> functions = {
     {"get_rpn", &rpn},
-    {"execute", &execute}
+    {"execute", &execute},
+    {"interactive", &interactive}
 };
 
 int main(int argc, char** argv)

@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.8)
 project(ExtCalculatorBenchmark)
 
+add_subdirectory(libraries)
+
 if (EXISTS ${CMAKE_CURRENT_LIST_DIR}/benchmark/CMakeLists.txt)
     add_subdirectory(benchmark)
 endif()
@@ -17,4 +19,5 @@ target_link_libraries(ExtCalculatorBenchmark
     ExtCalculator
     gtest
     benchmark
+    tinyexpr
 )

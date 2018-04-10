@@ -2,6 +2,7 @@
 #include <Calculator.hpp>
 #include <cmath>
 #include <StatementException.hpp>
+#include <ParsingException.hpp>
 
 TEST(Parsing, MinusAfter)
 {
@@ -17,8 +18,26 @@ TEST(Basic, Basic)
     Calculator calc;
     calc.addBasicFunctions();
 
-    ASSERT_NO_THROW(calc.setExpression("atan2(0.5 0.2) + sin(0.2) / 2"));
+    ASSERT_NO_THROW(calc.setExpression("atan2(0.5, 0.2) + sin(0.2) / 2"));
     ASSERT_DOUBLE_EQ(calc.execute(), std::atan2(0.5, 0.2) + sin(0.2) / 2);
+}
+
+TEST(Basic, MultipleBraces)
+{
+    Calculator calc;
+    calc.addBasicFunctions();
+
+    ASSERT_NO_THROW(calc.setExpression("(1/(12+1)+2/(13+2)+3/(14+3))"));
+    ASSERT_DOUBLE_EQ(calc.execute(), (1.0/(12+1)+2.0/(13+2)+3.0/(14+3)));
+}
+
+TEST(Basic, CompressedCalculation)
+{
+    Calculator calc;
+    calc.addBasicFunctions();
+
+    ASSERT_NO_THROW(calc.setExpression("-2-2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), -2-2);
 }
 
 TEST(Basic, UnariMinus)
@@ -37,6 +56,18 @@ TEST(Basic, UnariPlus)
 
     ASSERT_NO_THROW(calc.setExpression("12 + +2"));
     ASSERT_DOUBLE_EQ(calc.execute(), 12 + +2);
+}
+
+TEST(Basic, Factorial)
+{
+    Calculator calc;
+    calc.addBasicFunctions();
+
+    ASSERT_NO_THROW(calc.setExpression("5!"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 120);
+
+    ASSERT_NO_THROW(calc.setExpression("5.2!"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 169.406099461722999);
 }
 
 TEST(Errors, UnbalancedBraces1)
@@ -66,10 +97,36 @@ TEST(Errors, UnbalancedStatement)
     Calculator calc;
     calc.addBasicFunctions();
 
-    ASSERT_NO_THROW(calc.setExpression("22 33 + 2"));
     ASSERT_THROW(
-        calc.execute(),
+        calc.setExpression("22 33 + 2"),
+        ParsingException
+    );
+}
+
+TEST(Errors, WrongArgumentsNumber)
+{
+    Calculator calc;
+    calc.addBasicFunctions();
+
+    ASSERT_THROW(
+        calc.setExpression("sin(22, 11)"),
         StatementException
+    );
+
+    ASSERT_THROW(
+        calc.setExpression("atan2(11)"),
+        StatementException
+    );
+}
+
+TEST(Errors, WrongArgumentsNumber2)
+{
+    Calculator calc;
+    calc.addBasicFunctions();
+
+    ASSERT_THROW(
+        calc.setExpression("(12 22)!"),
+        ParsingException
     );
 }
 

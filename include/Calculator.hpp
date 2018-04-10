@@ -6,6 +6,9 @@
 #include <variant>
 #include <vector>
 #include <functional>
+#include "ParsingException.hpp"
+#include "StatementException.hpp"
+#include "CalculationException.hpp"
 
 /**
  * @brief Main calculator class.
@@ -27,7 +30,8 @@ public:
             Variable,
             Function,
             BraceOpen,
-            BraceClosed
+            BraceClosed,
+            Comma
         };
 
         using ValueType = std::variant<
@@ -59,21 +63,13 @@ public:
         ValueType value;
     };
 
-    using LexemStack = std::stack<Lexem>;
+    using LexemStack = std::deque<Lexem>;
 
     struct Function
     {
-        enum class Type
-        {
-            Unknown,
-            Unary,
-            Binary,
-            Function
-        };
-
         Function() :
             name(),
-            type(Type::Unknown),
+            numberOfArguments(0),
             priority(0),
             function()
         {
@@ -81,11 +77,11 @@ public:
         }
 
         Function(std::string_view name,
-                 Type type,
+                 uint32_t numberOfArguments,
                  std::size_t priority,
                  std::function<double(LexemStack&)> function) :
             name(name),
-            type(type),
+            numberOfArguments(numberOfArguments),
             priority(priority),
             function(std::move(function))
         {
@@ -93,17 +89,22 @@ public:
         }
 
         std::string_view name;
-        Type type;
+        uint32_t numberOfArguments;
         std::size_t priority;
         std::function<double(LexemStack&)> function;
     };
+
+    /**
+     * @brief Constructor.
+     */
+    Calculator();
 
     /**
      * @brief Method for setting exception
      * This method will perform lexical parsing.
      * @param expression Expression.
      */
-    void setExpression(const std::string& expression);
+    void setExpression(std::string expression, bool optimize=true);
 
     /**
      * @brief Method for adding new function to
@@ -160,7 +161,7 @@ public:
      * @brief Method for getting parsed RPN.
      * @param lexems Lexems.
      */
-    void getRPN(std::vector<Lexem>& lexems);
+    void getRPN(LexemStack& lexems);
 
 private:
     enum SymbolType
@@ -172,24 +173,31 @@ private:
         Garbage
     };
 
-    void splitOnLexems(const std::string& string, std::vector<Lexem>& lexems);
+    void splitOnLexems(const std::string& string, LexemStack& lexems);
 
     Calculator::SymbolType getSymbolType(char c);
 
     // Splitting on lexems states
-    void noneState(const char*& string, std::vector<Calculator::Lexem>& lexems, int& state);
-    void numberState(const char*& string, std::vector<Calculator::Lexem>& lexems, int& state);
-    void stringState(const char*& string, std::vector<Calculator::Lexem>& lexems, int& state);
-    void quoteState(const char*& string, std::vector<Calculator::Lexem>& lexems, int& state);
+    void noneState  (const char*& string, LexemStack& lexems, int& state);
+    void numberState(const char*& string, LexemStack& lexems, int& state);
+    void stringState(const char*& string, LexemStack& lexems, int& state);
+    void braceState (const char*& string, LexemStack& lexems, int& state);
 
-    // Validating initial splitting on lexems and statement
-    void performValidation(const std::vector<Lexem>& lexems);
+    // Validating pushed values
+    void performValidation();
 
     // Pushing lexems as RPN
-    void pushLexems(std::vector<Lexem>& lexems);
+    void pushLexems(LexemStack& lexems);
 
+    // Optimization
+    void performOptimization();
+
+    std::string m_value;
     std::map<std::string_view, Function> m_functions;
-    std::vector<Lexem> m_expression;
+    LexemStack m_expression;
     std::map<std::string_view, double> m_variables;
+
+    int m_braceTest;
 };
 
+std::ostream& operator<<(std::ostream& stream, const Calculator::LexemStack& stack);
