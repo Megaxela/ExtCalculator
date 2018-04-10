@@ -13,6 +13,7 @@ if (${CALC_BUILD_TESTS} OR ${CALC_BUILD_BENCH})
 endif()
 
 if (${CALC_BUILD_BENCH})
+    set(BENCHMARK_ENABLE_TESTING Off)
     add_subdirectory(benchmark)
 endif()
 

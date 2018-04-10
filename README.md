@@ -13,6 +13,18 @@ It's CMake based project. Here is the steps how to build it.
     1. If you want to build tests or tests with benchmarks `--DCALC_BUILD_TESTS=On` or `-DCALC_BUILD_BENCH=On`.
 1. Build library: `cmake --build .`.
 
+## CLI
+Project contains command line interface for expression testing.
+Run CLI executable (`ExtCalculatorCLI`) to see available commands.
+
+Interactive mode enables with `interactive` command.
+
+###Interactive mode syntax:
+
+`[variable_name]=[expression]` - to set variable value.
+ 
+`[expression]` - to evaluate expression and get result.  
+
 ## Example:
 ```cpp
 #include "Calculator.hpp"
@@ -71,12 +83,12 @@ int main()
             "sample_function",
             2, // Number of arguments
             4, // Priority
-            [](Calculator::LexemStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto second = std::get<double>(stack.back().value);
+                auto second = stack.back();
                 stack.pop_back();
 
-                auto first = std::get<double>(stack.back().value);
+                auto first = stack.back();
                 stack.pop_back();
 
                 return second + first;

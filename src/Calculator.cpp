@@ -620,10 +620,10 @@ void Calculator::addBasicFunctions()
             1,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto rightValue = stack.front();
+                auto rightValue = stack.back();
                 stack.pop_back();
 
-                auto leftValue = stack.front();
+                auto leftValue = stack.back();
                 stack.pop_back();
 
                 return leftValue + rightValue;
@@ -638,10 +638,10 @@ void Calculator::addBasicFunctions()
             1,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto rightValue = stack.front();
+                auto rightValue = stack.back();
                 stack.pop_back();
 
-                auto leftValue = stack.front();
+                auto leftValue = stack.back();
                 stack.pop_back();
 
                 return leftValue - rightValue;
@@ -656,10 +656,10 @@ void Calculator::addBasicFunctions()
             2,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto rightValue = stack.front();
+                auto rightValue = stack.back();
                 stack.pop_back();
 
-                auto leftValue = stack.front();
+                auto leftValue = stack.back();
                 stack.pop_back();
 
                 return leftValue * rightValue;
@@ -674,10 +674,10 @@ void Calculator::addBasicFunctions()
             2,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto rightValue = stack.front();
+                auto rightValue = stack.back();
                 stack.pop_back();
 
-                auto leftValue = stack.front();
+                auto leftValue = stack.back();
                 stack.pop_back();
 
                 return leftValue / rightValue;
@@ -692,10 +692,10 @@ void Calculator::addBasicFunctions()
             3,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto rightValue = stack.front();
+                auto rightValue = stack.back();
                 stack.pop_back();
 
-                auto leftValue = stack.front();
+                auto leftValue = stack.back();
                 stack.pop_back();
 
                 return std::pow(leftValue, rightValue);
@@ -710,7 +710,7 @@ void Calculator::addBasicFunctions()
             3,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto value = stack.front();
+                auto value = stack.back();
                 stack.pop_back();
 
                 return std::tgamma(value + 1);
@@ -725,7 +725,7 @@ void Calculator::addBasicFunctions()
             4,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto value = stack.front();
+                auto value = stack.back();
                 stack.pop_back();
 
                 return std::sin(value);
@@ -740,7 +740,7 @@ void Calculator::addBasicFunctions()
             4,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto value = stack.front();
+                auto value = stack.back();
                 stack.pop_back();
 
                 return std::cos(value);
@@ -755,10 +755,10 @@ void Calculator::addBasicFunctions()
             4,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto value2 = stack.front();
+                auto value2 = stack.back();
                 stack.pop_back();
 
-                auto value1 = stack.front();
+                auto value1 = stack.back();
                 stack.pop_back();
 
                 return std::atan2(value1, value2);
@@ -773,7 +773,7 @@ void Calculator::addBasicFunctions()
             4,
             [](Calculator::ArgumentsStack& stack) -> double
             {
-                auto value = stack.front();
+                auto value = stack.back();
                 stack.pop_back();
 
                 return std::exp(value);
