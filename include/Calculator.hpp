@@ -36,7 +36,7 @@ public:
 
         using ValueType = std::variant<
             Function*,
-            std::string_view,
+            std::string,
             NumberType
         >;
 
@@ -44,6 +44,20 @@ public:
             type(Type::Unknown),
             value()
         {}
+
+        Lexem(Lexem&& mv) noexcept :
+            type(mv.type),
+            value(std::move(mv.value))
+        {
+
+        }
+
+        Lexem(const Lexem& mv) :
+            type(mv.type),
+            value(mv.value)
+        {
+
+        }
 
         explicit Lexem(Type type) :
             type(type),
@@ -59,11 +73,28 @@ public:
 
         }
 
+        Lexem& operator=(Lexem&& mv) noexcept
+        {
+            type = mv.type;
+            value = std::move(mv.value);
+
+            return *this;
+        }
+
+        Lexem& operator=(Lexem& mv)
+        {
+            type = mv.type;
+            value = mv.value;
+
+            return *this;
+        }
+
         Type type;
         ValueType value;
     };
 
     using LexemStack = std::deque<Lexem>;
+    using ArgumentsStack = std::vector<NumberType>;
 
     struct Function
     {
@@ -76,11 +107,13 @@ public:
 
         }
 
-        Function(std::string_view name,
+        Function(std::string name,
                  uint32_t numberOfArguments,
                  std::size_t priority,
-                 std::function<double(LexemStack&)> function) :
-            name(name),
+//                 std::function<double(ArgumentsStack&)> function
+                 double (*function)(ArgumentsStack&)
+        ) :
+            name(std::move(name)),
             numberOfArguments(numberOfArguments),
             priority(priority),
             function(std::move(function))
@@ -88,10 +121,40 @@ public:
 
         }
 
-        std::string_view name;
+        Function(Function&& mv) noexcept :
+            name(std::move(mv.name)),
+            numberOfArguments(mv.numberOfArguments),
+            priority(mv.priority),
+            function(std::move(mv.function))
+        {
+
+        }
+
+        Function& operator=(Function&& mv) noexcept
+        {
+            name = std::move(mv.name);
+            numberOfArguments = mv.numberOfArguments;
+            priority = mv.priority;
+            function = std::move(mv.function);
+
+            return *this;
+        }
+
+        Function& operator=(const Function& mv)
+        {
+            name = mv.name;
+            numberOfArguments = mv.numberOfArguments;
+            priority = mv.priority;
+            function = mv.function;
+
+            return (*this);
+        }
+
+        std::string name;
         uint32_t numberOfArguments;
         std::size_t priority;
-        std::function<double(LexemStack&)> function;
+//        std::function<double(ArgumentsStack&)> function;
+        double (*function)(ArgumentsStack&);
     };
 
     /**
@@ -147,7 +210,7 @@ public:
      * @param name Variable name.
      * @param value Variable value.
      */
-    void setVariable(std::string_view name, double value);
+    void setVariable(std::string name, double value);
 
     /**
      * @brief Method for deleting variable name.
@@ -155,7 +218,7 @@ public:
      * be thrown if there is no variable with this name.
      * @param name Name.
      */
-    void deleteVariable(std::string_view name);
+    void deleteVariable(const std::string& name);
 
     /**
      * @brief Method for getting parsed RPN.
@@ -173,7 +236,7 @@ private:
         Garbage
     };
 
-    void splitOnLexems(const std::string& string, LexemStack& lexems);
+    void splitOnLexems(std::string string, LexemStack& lexems);
 
     Calculator::SymbolType getSymbolType(char c);
 
@@ -192,12 +255,13 @@ private:
     // Optimization
     void performOptimization();
 
-    std::string m_value;
-    std::map<std::string_view, Function> m_functions;
+    std::map<std::string, Function> m_functions;
     LexemStack m_expression;
-    std::map<std::string_view, double> m_variables;
+    std::map<std::string, double> m_variables;
 
     int m_braceTest;
+
+    ArgumentsStack m_executionStack;
 };
 
 std::ostream& operator<<(std::ostream& stream, const Calculator::LexemStack& stack);

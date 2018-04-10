@@ -4,36 +4,6 @@
 #include <CalculationException.hpp>
 #include "Calculator.hpp"
 
-void printLexems(const Calculator::LexemStack& lexems)
-{
-    for (auto&& lexem : lexems)
-    {
-        switch (lexem.type)
-        {
-        case Calculator::Lexem::Type::Unknown:
-            break;
-        case Calculator::Lexem::Type::Constant:
-            std::cout << std::get<double>(lexem.value);
-            break;
-        case Calculator::Lexem::Type::Variable:
-            std::cout << std::get<std::string_view>(lexem.value);
-            break;
-        case Calculator::Lexem::Type::Function:
-            std::cout << std::get<Calculator::Function*>(lexem.value)->name;
-            break;
-        case Calculator::Lexem::Type::BraceOpen:
-            std::cout << '(';
-            break;
-        case Calculator::Lexem::Type::BraceClosed:
-            std::cout << ')';
-            break;
-        }
-        std::cout << ' ';
-    }
-
-    std::cout << std::endl;
-}
-
 int rpn(int argc, char** argv)
 {
     if (argc < 1)
@@ -50,7 +20,7 @@ int rpn(int argc, char** argv)
     Calculator::LexemStack lexems;
     calc.getRPN(lexems);
 
-    printLexems(lexems);
+    std::cout << lexems << std::endl;
 
     return 0;
 }
@@ -73,7 +43,106 @@ int execute(int argc, char** argv)
     return 0;
 }
 
-int interactive(int argc, char** argv)
+enum SymbolType
+{
+    Alphabetic,
+    Special,
+    Decimal,
+    Braces,
+    Garbage
+};
+
+SymbolType getSymbolType(char c)
+{
+    static char special[] = {
+        '!',  '\"', '#', '$', '%', '&',  '\'', '*',
+        '+',  ',',  '-', '.', '/', '\\', '^',  '_',
+        '|',  '~'
+    };
+
+    static char braces[] = {
+        '(', ')', '[', ']', '{', '}'
+    };
+
+    if (std::isalpha(c))
+    {
+        return SymbolType::Alphabetic;
+    }
+
+    if (std::isdigit(c))
+    {
+        return SymbolType::Decimal;
+    }
+
+    for (char i : special)
+    {
+        if (i == c)
+        {
+            return SymbolType::Special;
+        }
+    }
+
+    for (char i : braces)
+    {
+        if (i == c)
+        {
+            return SymbolType::Braces;
+        }
+    }
+
+    return SymbolType::Garbage;
+}
+
+std::string get_variable(const std::string& output)
+{
+    std::string result;
+
+    auto string = output.c_str();
+
+    // Skipping initial spaces
+    while (*string == ' ')
+    {
+        ++string;
+    }
+
+    auto start = string;
+
+    // Detecting symbol type
+    auto symbolType = getSymbolType(*string);
+
+    if (symbolType == SymbolType::Garbage)
+    {
+        throw ParsingException("Garbage in variable/function name");
+    }
+
+    if (symbolType == SymbolType::Decimal)
+    {
+        throw ParsingException("Variable or function can't start with number");
+    }
+
+    while (*string &&
+           (symbolType == getSymbolType(*string) ||
+            (symbolType == SymbolType::Alphabetic &&
+             getSymbolType(*string) == SymbolType::Decimal) ||
+            (symbolType == SymbolType::Alphabetic &&
+             getSymbolType(*string) == SymbolType::Special &&
+             *string == '_')))
+    {
+        ++string;
+    }
+
+    auto size = std::distance(start, string);
+
+    // If there is some strange error.
+    if (size == 0)
+    {
+        throw ParsingException("Internal error");
+    }
+
+    return std::string(start, static_cast<std::string::size_type>(size));
+}
+
+int interactive(int, char**)
 {
     std::string output;
 
@@ -84,10 +153,17 @@ int interactive(int argc, char** argv)
 
     std::cout << "Calculator initialized." << std::endl;
 
+    std::string variableName;
+
     while (true)
     {
         std::cout << '>';
         std::getline(std::cin, output);
+
+        if (output == "<print_variables>")
+        {
+            break;
+        }
 
         if (output == "quit")
         {
@@ -96,7 +172,22 @@ int interactive(int argc, char** argv)
 
         try
         {
-            calculator.setExpression(output);
+            // Trying to split function and variable declaration
+            auto equalPos = output.find('=');
+            if (equalPos != std::string::npos)
+            {
+                variableName = get_variable(output);
+
+                std::cout << "Found variable \"" << variableName << "\"" << std::endl;
+
+                if (variableName.empty())
+                {
+                    std::cout << "Variable can't be empty." << std::endl;
+                    continue;
+                }
+            }
+
+            calculator.setExpression(std::move(output.substr(equalPos + 1)));
         }
         catch (ParsingException& e)
         {
@@ -111,7 +202,17 @@ int interactive(int argc, char** argv)
 
         try
         {
-            std::cout << calculator.execute() << std::endl << std::endl;
+            auto result = calculator.execute();
+
+            if (!variableName.empty())
+            {
+                std::cout << "Setting variable \"" << variableName << "\" with value " << result << std::endl;
+                calculator.setVariable(std::move(variableName), result);
+
+                std::exchange(variableName, "");
+            }
+
+            std::cout << result << std::endl << std::endl;
         }
         catch (CalculationException& e)
         {
@@ -122,22 +223,6 @@ int interactive(int argc, char** argv)
     std::cout << "Calculator closed." << std::endl;
 
     return 0;
-}
-
-int execute_debug(int argc, char** argv)
-{
-    if (argc < 1)
-    {
-        std::cerr << "Need expression to convert." << std::endl;
-        return 1;
-    }
-
-    Calculator calc;
-    calc.addBasicFunctions();
-
-    calc.setExpression(argv[0]);
-
-
 }
 
 static std::map<std::string_view, std::function<int(int, char**)>> functions = {
