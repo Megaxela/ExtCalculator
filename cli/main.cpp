@@ -139,6 +139,17 @@ std::string get_variable(const std::string& output)
         throw ParsingException("Internal error");
     }
 
+    // Checking rest of string
+    while (*string)
+    {
+        if (*string != ' ')
+        {
+            throw ParsingException("Wrong variable format");
+        }
+
+        ++string;
+    }
+
     return std::string(start, static_cast<std::string::size_type>(size));
 }
 
@@ -160,11 +171,6 @@ int interactive(int, char**)
         std::cout << '>';
         std::getline(std::cin, output);
 
-        if (output == "<print_variables>")
-        {
-            break;
-        }
-
         if (output == "quit")
         {
             break;
@@ -176,7 +182,7 @@ int interactive(int, char**)
             auto equalPos = output.find('=');
             if (equalPos != std::string::npos)
             {
-                variableName = get_variable(output);
+                variableName = get_variable(output.substr(0, equalPos));
 
                 std::cout << "Found variable \"" << variableName << "\"" << std::endl;
 

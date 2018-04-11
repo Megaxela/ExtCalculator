@@ -12,7 +12,8 @@ Calculator::Calculator() :
     m_expression(),
     m_variables(),
     m_braceTest(0),
-    m_executionStack()
+    m_executionStack(),
+    m_stringHash()
 {
 
 }
@@ -83,7 +84,7 @@ void Calculator::performValidation()
     }
 }
 
-void Calculator::noneState(const char*& string, LexemStack& /* lexems */, int& state)
+void Calculator::noneState(char*& string, LexemStack& /* lexems */, int& state)
 {
     if (isdigit(*string) ||
         *string == '.' ||
@@ -107,7 +108,7 @@ void Calculator::noneState(const char*& string, LexemStack& /* lexems */, int& s
     ++string;
 }
 
-void Calculator::numberState(const char*& string, LexemStack& lexems, int& state)
+void Calculator::numberState(char*& string, LexemStack& lexems, int& state)
 {
     auto start = string;
     auto dotFound = false;
@@ -153,8 +154,12 @@ void Calculator::numberState(const char*& string, LexemStack& lexems, int& state
 
             try
             {
-                // Optimize
-                value = std::stod(std::string(start, len));
+                auto terminator_bu = *string;
+                *string = '\0';
+
+                value = std::atof(start);
+
+                *string = terminator_bu;
             }
             catch (std::invalid_argument& argument)
             {
@@ -196,8 +201,12 @@ void Calculator::numberState(const char*& string, LexemStack& lexems, int& state
 
         try
         {
-            // Optimize
-            value = std::stod(std::string(start, len));
+            auto terminator_bu = *string;
+            *string = '\0';
+
+            value = std::atof(start);
+
+            *string = terminator_bu;
         }
         catch (std::invalid_argument& argument)
         {
@@ -215,15 +224,20 @@ void Calculator::numberState(const char*& string, LexemStack& lexems, int& state
 
 Calculator::SymbolType Calculator::getSymbolType(char c)
 {
-    static char special[] = {
-         '!',  '\"', '#', '$', '%', '&',  '\'', '*',
-         '+',  ',',  '-', '.', '/', '\\', '^',  '_',
-         '|',  '~'
-    };
+    for (char i : {'(', ')',
+                   '[', ']',
+                   '{', '}'})
+    {
+        if (i == c)
+        {
+            return SymbolType::Braces;
+        }
+    }
 
-    static char braces[] = {
-        '(', ')', '[', ']', '{', '}'
-    };
+    if (std::ispunct(c))
+    {
+        return SymbolType::Special;
+    }
 
     if (std::isalpha(c))
     {
@@ -235,26 +249,10 @@ Calculator::SymbolType Calculator::getSymbolType(char c)
         return SymbolType::Decimal;
     }
 
-    for (char i : special)
-    {
-        if (i == c)
-        {
-            return SymbolType::Special;
-        }
-    }
-
-    for (char i : braces)
-    {
-        if (i == c)
-        {
-            return SymbolType::Braces;
-        }
-    }
-
     return SymbolType::Garbage;
 }
 
-void Calculator::stringState(const char*& string, LexemStack& lexems, int& state)
+void Calculator::stringState(char*& string, LexemStack& lexems, int& state)
 {
     Lexem lexem;
 
@@ -287,15 +285,21 @@ void Calculator::stringState(const char*& string, LexemStack& lexems, int& state
         return;
     }
 
+    SymbolType newSymbolType = symbolType;
     while (*string &&
-           (symbolType == getSymbolType(*string) ||
+           (symbolType == newSymbolType ||
                (symbolType == SymbolType::Alphabetic &&
-                getSymbolType(*string) == SymbolType::Decimal) ||
+                newSymbolType == SymbolType::Decimal) ||
                (symbolType == SymbolType::Alphabetic &&
-                getSymbolType(*string) == SymbolType::Special &&
+                newSymbolType == SymbolType::Special &&
                 *string == '_')))
     {
         ++string;
+
+        if (*string)
+        {
+            newSymbolType = getSymbolType(*string);
+        }
     }
 
     auto size = std::distance(start, string);
@@ -306,29 +310,22 @@ void Calculator::stringState(const char*& string, LexemStack& lexems, int& state
         throw ParsingException("Internal error");
     }
 
-    std::string name(start, static_cast<std::string::size_type>(size));
+    auto nameHash = m_stringHash(std::string_view(start, static_cast<std::string::size_type>(size)));
 
-    bool found = false;
-
-    auto function = m_functions.find(name);
+    auto function = m_functions.find(nameHash);
 
     if (function != m_functions.end())
     {
         lexem.value = &function->second;
         lexem.type = Lexem::Type::Function;
 
-        found = true;
-    }
-
-    if (found)
-    {
         lexems.emplace_back(std::move(lexem));
         state = 0; // None state
         return;
     }
 
     // It's variable then
-    lexem.value = std::move(name);
+    lexem.value = nameHash;
     lexem.type = Lexem::Type::Variable;
 
     lexems.emplace_back(std::move(lexem));
@@ -336,18 +333,26 @@ void Calculator::stringState(const char*& string, LexemStack& lexems, int& state
     state = 0; // None state
 }
 
-void Calculator::braceState(const char*& string, LexemStack& lexems, int& state)
+void Calculator::braceState(char*& string, LexemStack& lexems, int& state)
 {
     if (*string == '(')
     {
-        lexems.emplace_back(Calculator::Lexem(Calculator::Lexem::Type::BraceOpen));
+        lexems.emplace_back(
+            std::move(
+                Calculator::Lexem(Calculator::Lexem::Type::BraceOpen)
+            )
+        );
         ++string;
 
         ++m_braceTest;
     }
     else if (*string == ')')
     {
-        lexems.emplace_back(Calculator::Lexem(Calculator::Lexem::Type::BraceClosed));
+        lexems.emplace_back(
+            std::move(
+                Calculator::Lexem(Calculator::Lexem::Type::BraceClosed)
+            )
+        );
         ++string;
 
         --m_braceTest;
@@ -366,18 +371,18 @@ void Calculator::braceState(const char*& string, LexemStack& lexems, int& state)
 
 void Calculator::splitOnLexems(std::string string, LexemStack& lexems)
 {
-    using LexemParserState = std::function<void(const char*&, LexemStack&, int&)>;
+    using LexemParserState = void(Calculator::*)(char*&, LexemStack&, int&);
 
     // 0 - none state.
     // 1 - parsing number
     // 2 - parsing string (function/variable)
     // 3 - quote
 
-    LexemParserState states[] = {
-        std::bind(&Calculator::noneState,   this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3),
-        std::bind(&Calculator::numberState, this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3),
-        std::bind(&Calculator::stringState, this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3),
-        std::bind(&Calculator::braceState,  this, std::placeholders::_1,std::placeholders::_2, std::placeholders::_3)
+    static LexemParserState states[] = {
+        &Calculator::noneState,
+        &Calculator::numberState,
+        &Calculator::stringState,
+        &Calculator::braceState,
     };
 
     auto state = 0;
@@ -389,7 +394,7 @@ void Calculator::splitOnLexems(std::string string, LexemStack& lexems)
     {
         int newState = -1;
 
-        states[state](s, lexems, newState);
+        ((*this).*states[state])(const_cast<char*&>(s), lexems, newState);
 
         if (newState > -1)
         {
@@ -405,7 +410,7 @@ void Calculator::splitOnLexems(std::string string, LexemStack& lexems)
 
 void Calculator::addFunction(Calculator::Function func)
 {
-    m_functions[func.name] = std::move(func);
+    m_functions[m_stringHash(func.name)] = std::move(func);
 }
 
 void Calculator::pushLexems(LexemStack& lexems)
@@ -464,12 +469,12 @@ void Calculator::pushLexems(LexemStack& lexems)
 
 void Calculator::setVariable(std::string name, double value)
 {
-    m_variables[std::move(name)] = value;
+    m_variables[m_stringHash(name)] = value;
 }
 
 void Calculator::deleteVariable(const std::string& name)
 {
-    auto search_result = m_variables.find(name);
+    auto search_result = m_variables.find(m_stringHash(name));
 
     if (search_result == m_variables.end())
     {
@@ -480,13 +485,14 @@ void Calculator::deleteVariable(const std::string& name)
         );
     }
 
-    m_variables.erase(name);
+    m_variables.erase(search_result);
 }
 
 void Calculator::performOptimization()
 {
     LexemStack stack;
-    ArgumentsStack argStack;
+
+    m_executionStack.clear();
 
     uint32_t args = 0;
     Function* func = nullptr;
@@ -496,11 +502,11 @@ void Calculator::performOptimization()
         switch (lexem.type)
         {
         case Lexem::Type::Constant:
-            argStack.push_back(std::get<double>(lexem.value));
+            m_executionStack.push_back(std::get<double>(lexem.value));
             break;
 
         case Lexem::Type::Variable:
-            for (auto&& el : argStack)
+            for (auto&& el : m_executionStack)
             {
                 stack.emplace_back(
                     Lexem(
@@ -510,7 +516,7 @@ void Calculator::performOptimization()
                 );
             }
 
-            argStack.clear();
+            m_executionStack.clear();
 
             stack.push_back(lexem);
 
@@ -520,15 +526,15 @@ void Calculator::performOptimization()
             func = std::get<Function*>(lexem.value);
             args = func->numberOfArguments;
 
-            if (argStack.size() >= args)
+            if (m_executionStack.size() >= args)
             {
-                argStack.emplace_back(
-                    func->function(argStack)
+                m_executionStack.emplace_back(
+                    func->function(m_executionStack)
                 );
             }
             else
             {
-                for (auto&& el : argStack)
+                for (auto&& el : m_executionStack)
                 {
                     stack.emplace_back(
                         Lexem(
@@ -538,7 +544,7 @@ void Calculator::performOptimization()
                     );
                 }
 
-                argStack.clear();
+                m_executionStack.clear();
 
                 stack.push_back(lexem);
             }
@@ -550,7 +556,7 @@ void Calculator::performOptimization()
         }
     }
     
-    for (auto&& el : argStack)
+    for (auto&& el : m_executionStack)
     {
         stack.emplace_back(
             Lexem(
@@ -577,13 +583,13 @@ double Calculator::execute()
             m_executionStack.push_back(std::get<double>(lexem.value));
             break;
         case Lexem::Type::Variable:
-            variableValue = m_variables.find(std::get<std::string>(lexem.value));
+            variableValue = m_variables.find(std::get<std::size_t>(lexem.value));
 
             if (variableValue == m_variables.end())
             {
                 throw CalculationException(
                     std::string("No variable \"")
-                        .append(std::get<std::string>(lexem.value))
+                        .append(std::to_string(std::get<std::size_t>(lexem.value)))
                         .append("\" defined")
                 );
             }
@@ -795,7 +801,7 @@ std::ostream& operator<<(std::ostream& stream, const Calculator::LexemStack& sta
             stream << std::get<double>(lexem.value);
             break;
         case Calculator::Lexem::Type::Variable:
-            stream << std::get<std::string>(lexem.value);
+            stream << 'V' << std::get<std::size_t>(lexem.value);
             break;
         case Calculator::Lexem::Type::Function:
             stream << std::get<Calculator::Function*>(lexem.value)->name;

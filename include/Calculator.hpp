@@ -36,7 +36,7 @@ public:
 
         using ValueType = std::variant<
             Function*,
-            std::string,
+            std::size_t,
             NumberType
         >;
 
@@ -110,13 +110,12 @@ public:
         Function(std::string name,
                  uint32_t numberOfArguments,
                  std::size_t priority,
-//                 std::function<double(ArgumentsStack&)> function
                  double (*function)(ArgumentsStack&)
         ) :
             name(std::move(name)),
             numberOfArguments(numberOfArguments),
             priority(priority),
-            function(std::move(function))
+            function(function)
         {
 
         }
@@ -125,7 +124,7 @@ public:
             name(std::move(mv.name)),
             numberOfArguments(mv.numberOfArguments),
             priority(mv.priority),
-            function(std::move(mv.function))
+            function(mv.function)
         {
 
         }
@@ -135,7 +134,7 @@ public:
             name = std::move(mv.name);
             numberOfArguments = mv.numberOfArguments;
             priority = mv.priority;
-            function = std::move(mv.function);
+            function = mv.function;
 
             return *this;
         }
@@ -153,7 +152,6 @@ public:
         std::string name;
         uint32_t numberOfArguments;
         std::size_t priority;
-//        std::function<double(ArgumentsStack&)> function;
         double (*function)(ArgumentsStack&);
     };
 
@@ -241,10 +239,10 @@ private:
     Calculator::SymbolType getSymbolType(char c);
 
     // Splitting on lexems states
-    void noneState  (const char*& string, LexemStack& lexems, int& state);
-    void numberState(const char*& string, LexemStack& lexems, int& state);
-    void stringState(const char*& string, LexemStack& lexems, int& state);
-    void braceState (const char*& string, LexemStack& lexems, int& state);
+    void noneState  (char*& string, LexemStack& lexems, int& state);
+    void numberState(char*& string, LexemStack& lexems, int& state);
+    void stringState(char*& string, LexemStack& lexems, int& state);
+    void braceState (char*& string, LexemStack& lexems, int& state);
 
     // Validating pushed values
     void performValidation();
@@ -255,13 +253,15 @@ private:
     // Optimization
     void performOptimization();
 
-    std::map<std::string, Function> m_functions;
+    std::map<std::size_t, Function> m_functions;
     LexemStack m_expression;
-    std::map<std::string, double> m_variables;
+    std::map<std::size_t, double> m_variables;
 
     int m_braceTest;
 
     ArgumentsStack m_executionStack;
+
+    std::hash<std::string_view> m_stringHash;
 };
 
 std::ostream& operator<<(std::ostream& stream, const Calculator::LexemStack& stack);
