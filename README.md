@@ -19,7 +19,7 @@ Run CLI executable (`ExtCalculatorCLI`) to see available commands.
 
 Interactive mode enables with `interactive` command.
 
-###Interactive mode syntax:
+##Interactive mode syntax:
 
 `[variable_name]=[expression]` - to set variable value.
  

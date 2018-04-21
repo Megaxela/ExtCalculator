@@ -35,6 +35,8 @@ int execute(int argc, char** argv)
 
     Calculator calc;
     calc.addBasicFunctions();
+    calc.addLogicFunctions();
+    calc.addConstants();
 
     calc.setExpression(argv[0]);
 

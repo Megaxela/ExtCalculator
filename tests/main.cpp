@@ -92,6 +92,17 @@ TEST(Errors, UnbalancedBraces2)
     );
 }
 
+TEST(Errors, UnbalancedBraces3)
+{
+    Calculator calc;
+    calc.addBasicFunctions();
+
+    ASSERT_THROW(
+        calc.setExpression("12 * 22 * sin(12) + {12 + 2]"),
+        StatementException
+    );
+}
+
 TEST(Errors, UnbalancedStatement)
 {
     Calculator calc;
@@ -153,6 +164,79 @@ TEST(Variables, Basic)
             }
         }
     }
+}
+
+TEST(Logic, Comparison)
+{
+    Calculator calc;
+    calc.addLogicFunctions();
+
+    // <
+    ASSERT_NO_THROW(calc.setExpression("1 < 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 1);
+
+    ASSERT_NO_THROW(calc.setExpression("2 < 1"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 0);
+
+    // >
+    ASSERT_NO_THROW(calc.setExpression("2 > 1"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 1);
+
+    ASSERT_NO_THROW(calc.setExpression("1 > 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 0);
+
+    // >=
+    ASSERT_NO_THROW(calc.setExpression("1 >= 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 0);
+
+    ASSERT_NO_THROW(calc.setExpression("2 >= 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 1);
+
+    ASSERT_NO_THROW(calc.setExpression("2 >= 1"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 1);
+
+    // <=
+    ASSERT_NO_THROW(calc.setExpression("2 <= 1"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 0);
+
+    ASSERT_NO_THROW(calc.setExpression("2 <= 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 1);
+
+    ASSERT_NO_THROW(calc.setExpression("1 <= 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 1);
+
+    // ==
+    ASSERT_NO_THROW(calc.setExpression("1 == 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 0);
+
+    ASSERT_NO_THROW(calc.setExpression("1 == 1"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 1);
+
+    // !=
+    ASSERT_NO_THROW(calc.setExpression("1 != 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 1);
+
+    ASSERT_NO_THROW(calc.setExpression("1 != 1"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 0);
+
+    // if
+    ASSERT_NO_THROW(calc.setExpression("if (1) {12} {13}"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 12);
+
+    ASSERT_NO_THROW(calc.setExpression("if (0) {12} {13}"));
+    ASSERT_DOUBLE_EQ(calc.execute(), 13);
+}
+
+TEST(Constants, Base)
+{
+    Calculator calc;
+    calc.addConstants();
+
+    ASSERT_NO_THROW(calc.setExpression("Pi / 2"));
+    ASSERT_DOUBLE_EQ(calc.execute(), M_PI / 2);
+
+    ASSERT_NO_THROW(calc.setExpression("e"));
+    ASSERT_DOUBLE_EQ(calc.execute(), M_E);
 }
 
 int main(int argc, char** argv)

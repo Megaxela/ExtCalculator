@@ -9,13 +9,117 @@
 
 Calculator::Calculator() :
     m_functions(),
-    m_expression(),
     m_variables(),
+    m_constants(),
+    m_expression(),
     m_braceTest(0),
     m_executionStack(),
     m_stringHash()
 {
+    addFunction(
+        Calculator::Function(
+            "+",
+            2, // Binary function. Undefined number of args
+            1,
+            [](Calculator::ArgumentsStack& stack) -> double
+            {
+                auto rightValue = stack.back();
+                stack.pop_back();
 
+                auto leftValue = stack.back();
+                stack.pop_back();
+
+                return leftValue + rightValue;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "-",
+            2, // Binary function. Undefined number of args
+            1,
+            [](Calculator::ArgumentsStack& stack) -> double
+            {
+                auto rightValue = stack.back();
+                stack.pop_back();
+
+                auto leftValue = stack.back();
+                stack.pop_back();
+
+                return leftValue - rightValue;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "*",
+            2, // Binary function. Undefined number of args
+            2,
+            [](Calculator::ArgumentsStack& stack) -> double
+            {
+                auto rightValue = stack.back();
+                stack.pop_back();
+
+                auto leftValue = stack.back();
+                stack.pop_back();
+
+                return leftValue * rightValue;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "/",
+            2, // Binary function. Undefined number of args
+            2,
+            [](Calculator::ArgumentsStack& stack) -> double
+            {
+                auto rightValue = stack.back();
+                stack.pop_back();
+
+                auto leftValue = stack.back();
+                stack.pop_back();
+
+                return leftValue / rightValue;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "^",
+            2, // Binary function. Undefined number of args
+            3,
+            [](Calculator::ArgumentsStack& stack) -> double
+            {
+                auto rightValue = stack.back();
+                stack.pop_back();
+
+                auto leftValue = stack.back();
+                stack.pop_back();
+
+                return std::pow(leftValue, rightValue);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "!",
+            1, // Binary function. Undefined number of args
+            3,
+            [](Calculator::ArgumentsStack& stack) -> double
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::tgamma(value + 1);
+            }
+        )
+    );
 }
 
 void Calculator::setExpression(std::string expression, bool optimize)
@@ -94,7 +198,12 @@ void Calculator::noneState(char*& string, LexemStack& /* lexems */, int& state)
         state = 1; // Number
         return;
     }
-    else if (*string == '(' || *string == ')')
+    else if (*string == '(' ||
+             *string == ')' ||
+             *string == ']' ||
+             *string == '[' ||
+             *string == '{' ||
+             *string == '}')
     {
         state = 3; // Braces
         return;
@@ -324,6 +433,18 @@ void Calculator::stringState(char*& string, LexemStack& lexems, int& state)
         return;
     }
 
+    auto constant = m_constants.find(nameHash);
+
+    if (constant != m_constants.end())
+    {
+        lexem.value = constant->second;
+        lexem.type = Lexem::Type::Constant;
+
+        lexems.emplace_back(std::move(lexem));
+        state = 0;
+        return;
+    }
+
     // It's variable then
     lexem.value = nameHash;
     lexem.type = Lexem::Type::Variable;
@@ -335,27 +456,54 @@ void Calculator::stringState(char*& string, LexemStack& lexems, int& state)
 
 void Calculator::braceState(char*& string, LexemStack& lexems, int& state)
 {
-    if (*string == '(')
+    if (*string == '(' ||
+        *string == '[' ||
+        *string == '{')
     {
         lexems.emplace_back(
             std::move(
                 Calculator::Lexem(Calculator::Lexem::Type::BraceOpen)
             )
         );
-        ++string;
 
-        ++m_braceTest;
+
+        switch (*string)
+        {
+        case '(':
+            m_braceTest += 1;
+            break;
+        case '[':
+            m_braceTest += 2;
+            break;
+        case '{':
+            m_braceTest += 3;
+            break;
+        }
+        ++string;
     }
-    else if (*string == ')')
+    else if (*string == ')' ||
+             *string == ']' ||
+             *string == '}')
     {
         lexems.emplace_back(
             std::move(
                 Calculator::Lexem(Calculator::Lexem::Type::BraceClosed)
             )
         );
-        ++string;
 
-        --m_braceTest;
+        switch (*string)
+        {
+        case ')':
+            m_braceTest -= 1;
+            break;
+        case ']':
+            m_braceTest -= 2;
+            break;
+        case '}':
+            m_braceTest -= 3;
+            break;
+        }
+        ++string;
     }
     else
     {
@@ -621,111 +769,6 @@ void Calculator::addBasicFunctions()
 {
     addFunction(
         Calculator::Function(
-            "+",
-            2, // Binary function. Undefined number of args
-            1,
-            [](Calculator::ArgumentsStack& stack) -> double
-            {
-                auto rightValue = stack.back();
-                stack.pop_back();
-
-                auto leftValue = stack.back();
-                stack.pop_back();
-
-                return leftValue + rightValue;
-            }
-        )
-    );
-
-    addFunction(
-        Calculator::Function(
-            "-",
-            2, // Binary function. Undefined number of args
-            1,
-            [](Calculator::ArgumentsStack& stack) -> double
-            {
-                auto rightValue = stack.back();
-                stack.pop_back();
-
-                auto leftValue = stack.back();
-                stack.pop_back();
-
-                return leftValue - rightValue;
-            }
-        )
-    );
-
-    addFunction(
-        Calculator::Function(
-            "*",
-            2, // Binary function. Undefined number of args
-            2,
-            [](Calculator::ArgumentsStack& stack) -> double
-            {
-                auto rightValue = stack.back();
-                stack.pop_back();
-
-                auto leftValue = stack.back();
-                stack.pop_back();
-
-                return leftValue * rightValue;
-            }
-        )
-    );
-
-    addFunction(
-        Calculator::Function(
-            "/",
-            2, // Binary function. Undefined number of args
-            2,
-            [](Calculator::ArgumentsStack& stack) -> double
-            {
-                auto rightValue = stack.back();
-                stack.pop_back();
-
-                auto leftValue = stack.back();
-                stack.pop_back();
-
-                return leftValue / rightValue;
-            }
-        )
-    );
-
-    addFunction(
-        Calculator::Function(
-            "^",
-            2, // Binary function. Undefined number of args
-            3,
-            [](Calculator::ArgumentsStack& stack) -> double
-            {
-                auto rightValue = stack.back();
-                stack.pop_back();
-
-                auto leftValue = stack.back();
-                stack.pop_back();
-
-                return std::pow(leftValue, rightValue);
-            }
-        )
-    );
-
-    addFunction(
-        Calculator::Function(
-            "!",
-            1, // Binary function. Undefined number of args
-            3,
-            [](Calculator::ArgumentsStack& stack) -> double
-            {
-                auto value = stack.back();
-                stack.pop_back();
-
-                return std::tgamma(value + 1);
-            }
-        )
-    );
-
-    addFunction(
-        Calculator::Function(
             "sin",
             1, // One arg
             4,
@@ -786,6 +829,149 @@ void Calculator::addBasicFunctions()
             }
         )
     );
+}
+
+void Calculator::addLogicFunctions()
+{
+    addFunction(
+        Calculator::Function(
+            ">",
+            2,
+            0,
+            [](Calculator::ArgumentsStack& arguments) -> double
+            {
+                auto rhs = arguments.back();
+                arguments.pop_back();
+
+                auto lhs = arguments.back();
+                arguments.pop_back();
+
+                return lhs > rhs;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "<",
+            2,
+            0,
+            [](Calculator::ArgumentsStack& arguments) -> double
+            {
+                auto rhs = arguments.back();
+                arguments.pop_back();
+
+                auto lhs = arguments.back();
+                arguments.pop_back();
+
+                return lhs < rhs;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            ">=",
+            2,
+            0,
+            [](Calculator::ArgumentsStack& arguments) -> double
+            {
+                auto rhs = arguments.back();
+                arguments.pop_back();
+
+                auto lhs = arguments.back();
+                arguments.pop_back();
+
+                return lhs >= rhs;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "<=",
+            2,
+            0,
+            [](Calculator::ArgumentsStack& arguments) -> double
+            {
+                auto rhs = arguments.back();
+                arguments.pop_back();
+
+                auto lhs = arguments.back();
+                arguments.pop_back();
+
+                return lhs <= rhs;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "==",
+            2,
+            0,
+            [](Calculator::ArgumentsStack& arguments) -> double
+            {
+                auto rhs = arguments.back();
+                arguments.pop_back();
+
+                auto lhs = arguments.back();
+                arguments.pop_back();
+
+                return lhs == rhs;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "!=",
+            2,
+            0,
+            [](Calculator::ArgumentsStack& arguments) -> double
+            {
+                auto rhs = arguments.back();
+                arguments.pop_back();
+
+                auto lhs = arguments.back();
+                arguments.pop_back();
+
+                return lhs != rhs;
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "if",
+            3,
+            0,
+            [](Calculator::ArgumentsStack& arguments) -> double
+            {
+                auto second = arguments.back();
+                arguments.pop_back();
+
+                auto first = arguments.back();
+                arguments.pop_back();
+
+                auto expression = arguments.back();
+                arguments.pop_back();
+
+                return expression ? first : second;
+            }
+        )
+    );
+}
+
+void Calculator::addConstants()
+{
+    addConstant("Pi", M_PI);
+    addConstant("e",  M_E);
+}
+
+void Calculator::addConstant(std::string name, double value)
+{
+    m_constants[m_stringHash(name)] = value;
 }
 
 std::ostream& operator<<(std::ostream& stream, const Calculator::LexemStack& stack)

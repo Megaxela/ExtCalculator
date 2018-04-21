@@ -204,11 +204,37 @@ public:
     void addBasicFunctions();
 
     /**
+     * @brief Method for adding logic functions.
+     *
+     * Functions list:
+     * `if`, `>`, `<`, `>=`, `<=`, `==`, `!=`
+     */
+    void addLogicFunctions();
+
+    /**
+     * @brief Method for adding default constants.
+     *
+     * Constants list:
+     * `PI` -
+     */
+    void addConstants();
+
+    /**
      * @brief Method for setting variable value.
+     * Variables can be changed after setting expression.
      * @param name Variable name.
      * @param value Variable value.
      */
     void setVariable(std::string name, double value);
+
+    /**
+     * @brief Method for adding constant value.
+     * Constant values can not be changed after setting
+     * expression.
+     * @param name Constant name.
+     * @param value Constant variable.
+     */
+    void addConstant(std::string name, double value);
 
     /**
      * @brief Method for deleting variable name.
@@ -254,8 +280,9 @@ private:
     void performOptimization();
 
     std::map<std::size_t, Function> m_functions;
-    LexemStack m_expression;
     std::map<std::size_t, double> m_variables;
+    std::map<std::size_t, double> m_constants;
+    LexemStack m_expression;
 
     int m_braceTest;
 
