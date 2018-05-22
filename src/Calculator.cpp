@@ -21,7 +21,7 @@ Calculator::Calculator() :
             "+",
             2, // Binary function. Undefined number of args
             1,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto rightValue = stack.back();
                 stack.pop_back();
@@ -39,7 +39,7 @@ Calculator::Calculator() :
             "-",
             2, // Binary function. Undefined number of args
             1,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto rightValue = stack.back();
                 stack.pop_back();
@@ -57,7 +57,7 @@ Calculator::Calculator() :
             "*",
             2, // Binary function. Undefined number of args
             2,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto rightValue = stack.back();
                 stack.pop_back();
@@ -75,7 +75,7 @@ Calculator::Calculator() :
             "/",
             2, // Binary function. Undefined number of args
             2,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto rightValue = stack.back();
                 stack.pop_back();
@@ -93,7 +93,7 @@ Calculator::Calculator() :
             "^",
             2, // Binary function. Undefined number of args
             3,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto rightValue = stack.back();
                 stack.pop_back();
@@ -111,7 +111,7 @@ Calculator::Calculator() :
             "!",
             1, // Binary function. Undefined number of args
             3,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto value = stack.back();
                 stack.pop_back();
@@ -228,7 +228,7 @@ void Calculator::numberState(char*& string, LexemStack& lexems, int& state)
         {
             if (dotFound)
             {
-                throw ParsingException("Double dot detected in number");
+                throw ParsingException("NumberType dot detected in number");
             }
 
             dotFound = true;
@@ -259,7 +259,7 @@ void Calculator::numberState(char*& string, LexemStack& lexems, int& state)
                 return;
             }
 
-            double value;
+            NumberType value;
 
             try
             {
@@ -306,7 +306,7 @@ void Calculator::numberState(char*& string, LexemStack& lexems, int& state)
             return;
         }
 
-        double value;
+        NumberType value;
 
         try
         {
@@ -461,8 +461,8 @@ void Calculator::braceState(char*& string, LexemStack& lexems, int& state)
         *string == '{')
     {
         lexems.emplace_back(
-            std::move(
-                Calculator::Lexem(Calculator::Lexem::Type::BraceOpen)
+            Calculator::Lexem(
+                Calculator::Lexem::Type::BraceOpen
             )
         );
 
@@ -486,9 +486,9 @@ void Calculator::braceState(char*& string, LexemStack& lexems, int& state)
              *string == '}')
     {
         lexems.emplace_back(
-            std::move(
-                Calculator::Lexem(Calculator::Lexem::Type::BraceClosed)
-            )
+                Calculator::Lexem(
+                    Calculator::Lexem::Type::BraceClosed
+                )
         );
 
         switch (*string)
@@ -615,7 +615,7 @@ void Calculator::pushLexems(LexemStack& lexems)
     }
 }
 
-void Calculator::setVariable(std::string name, double value)
+void Calculator::setVariable(std::string name, NumberType value)
 {
     m_variables[m_stringHash(name)] = value;
 }
@@ -650,7 +650,7 @@ void Calculator::performOptimization()
         switch (lexem.type)
         {
         case Lexem::Type::Constant:
-            m_executionStack.push_back(std::get<double>(lexem.value));
+            m_executionStack.push_back(std::get<NumberType>(lexem.value));
             break;
 
         case Lexem::Type::Variable:
@@ -717,7 +717,7 @@ void Calculator::performOptimization()
     m_expression = std::move(stack);
 }
 
-double Calculator::execute()
+Calculator::NumberType Calculator::execute()
 {
     auto variableValue = m_variables.end();
 
@@ -728,7 +728,7 @@ double Calculator::execute()
         switch (lexem.type)
         {
         case Lexem::Type::Constant:
-            m_executionStack.push_back(std::get<double>(lexem.value));
+            m_executionStack.push_back(std::get<NumberType>(lexem.value));
             break;
         case Lexem::Type::Variable:
             variableValue = m_variables.find(std::get<std::size_t>(lexem.value));
@@ -769,10 +769,25 @@ void Calculator::addBasicFunctions()
 {
     addFunction(
         Calculator::Function(
+            "abs",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::abs(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
             "sin",
             1, // One arg
             4,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto value = stack.back();
                 stack.pop_back();
@@ -787,7 +802,7 @@ void Calculator::addBasicFunctions()
             "cos",
             1, // One arg
             4,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto value = stack.back();
                 stack.pop_back();
@@ -799,10 +814,70 @@ void Calculator::addBasicFunctions()
 
     addFunction(
         Calculator::Function(
+            "tan",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::tan(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "acos",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::acos(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "asin",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::asin(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "tan",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::tan(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
             "atan2",
             2, // Two args
             4,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto value2 = stack.back();
                 stack.pop_back();
@@ -817,15 +892,138 @@ void Calculator::addBasicFunctions()
 
     addFunction(
         Calculator::Function(
-            "exp",
+            "cosh",
             1, // One arg
             4,
-            [](Calculator::ArgumentsStack& stack) -> double
+            [](Calculator::ArgumentsStack& stack) -> NumberType
             {
                 auto value = stack.back();
                 stack.pop_back();
 
-                return std::exp(value);
+                return std::cosh(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "sinh",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::sinh(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "tanh",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::tanh(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "log",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::log(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "log10",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::log10(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "sqrt",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::sqrt(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "ceil",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::ceil(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "floor",
+            1, // One arg
+            4,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value = stack.back();
+                stack.pop_back();
+
+                return std::floor(value);
+            }
+        )
+    );
+
+    addFunction(
+        Calculator::Function(
+            "%",
+            2, // Two args
+            2,
+            [](Calculator::ArgumentsStack& stack) -> NumberType
+            {
+                auto value2 = stack.back();
+                stack.pop_back();
+
+                auto value1 = stack.back();
+                stack.pop_back();
+
+                return std::fmod(value1, value2);
             }
         )
     );
@@ -838,7 +1036,7 @@ void Calculator::addLogicFunctions()
             ">",
             2,
             0,
-            [](Calculator::ArgumentsStack& arguments) -> double
+            [](Calculator::ArgumentsStack& arguments) -> NumberType
             {
                 auto rhs = arguments.back();
                 arguments.pop_back();
@@ -856,7 +1054,7 @@ void Calculator::addLogicFunctions()
             "<",
             2,
             0,
-            [](Calculator::ArgumentsStack& arguments) -> double
+            [](Calculator::ArgumentsStack& arguments) -> NumberType
             {
                 auto rhs = arguments.back();
                 arguments.pop_back();
@@ -874,7 +1072,7 @@ void Calculator::addLogicFunctions()
             ">=",
             2,
             0,
-            [](Calculator::ArgumentsStack& arguments) -> double
+            [](Calculator::ArgumentsStack& arguments) -> NumberType
             {
                 auto rhs = arguments.back();
                 arguments.pop_back();
@@ -892,7 +1090,7 @@ void Calculator::addLogicFunctions()
             "<=",
             2,
             0,
-            [](Calculator::ArgumentsStack& arguments) -> double
+            [](Calculator::ArgumentsStack& arguments) -> NumberType
             {
                 auto rhs = arguments.back();
                 arguments.pop_back();
@@ -910,7 +1108,7 @@ void Calculator::addLogicFunctions()
             "==",
             2,
             0,
-            [](Calculator::ArgumentsStack& arguments) -> double
+            [](Calculator::ArgumentsStack& arguments) -> NumberType
             {
                 auto rhs = arguments.back();
                 arguments.pop_back();
@@ -928,7 +1126,7 @@ void Calculator::addLogicFunctions()
             "!=",
             2,
             0,
-            [](Calculator::ArgumentsStack& arguments) -> double
+            [](Calculator::ArgumentsStack& arguments) -> NumberType
             {
                 auto rhs = arguments.back();
                 arguments.pop_back();
@@ -946,7 +1144,7 @@ void Calculator::addLogicFunctions()
             "if",
             3,
             0,
-            [](Calculator::ArgumentsStack& arguments) -> double
+            [](Calculator::ArgumentsStack& arguments) -> NumberType
             {
                 auto second = arguments.back();
                 arguments.pop_back();
@@ -969,7 +1167,7 @@ void Calculator::addConstants()
     addConstant("e",  M_E);
 }
 
-void Calculator::addConstant(std::string name, double value)
+void Calculator::addConstant(std::string name, NumberType value)
 {
     m_constants[m_stringHash(name)] = value;
 }
@@ -984,7 +1182,7 @@ std::ostream& operator<<(std::ostream& stream, const Calculator::LexemStack& sta
             stream << "???";
             break;
         case Calculator::Lexem::Type::Constant:
-            stream << std::get<double>(lexem.value);
+            stream << std::get<Calculator::NumberType>(lexem.value);
             break;
         case Calculator::Lexem::Type::Variable:
             stream << 'V' << std::get<std::size_t>(lexem.value);

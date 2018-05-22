@@ -14,6 +14,8 @@ int rpn(int argc, char** argv)
 
     Calculator calc;
     calc.addBasicFunctions();
+    calc.addLogicFunctions();
+    calc.addConstants();
 
     calc.setExpression(argv[0]);
 
@@ -163,6 +165,8 @@ int interactive(int, char**)
 
     Calculator calculator;
     calculator.addBasicFunctions();
+    calculator.addLogicFunctions();
+    calculator.addConstants();
 
     std::cout << "Calculator initialized." << std::endl;
 
@@ -195,7 +199,7 @@ int interactive(int, char**)
                 }
             }
 
-            calculator.setExpression(std::move(output.substr(equalPos + 1)));
+            calculator.setExpression(output.substr(equalPos + 1));
         }
         catch (ParsingException& e)
         {

@@ -35,9 +35,9 @@ public:
         };
 
         using ValueType = std::variant<
-            Function*,
-            std::size_t,
-            NumberType
+            Function*,   // Function
+            std::size_t, // Variable hash
+            NumberType   // Constant value
         >;
 
         Lexem() :
@@ -96,8 +96,15 @@ public:
     using LexemStack = std::deque<Lexem>;
     using ArgumentsStack = std::vector<NumberType>;
 
+    /**
+     * @brief Structure, that describes
+     * calculator function.
+     */
     struct Function
     {
+        /**
+         * @brief Default constructor.
+         */
         Function() :
             name(),
             numberOfArguments(0),
@@ -107,10 +114,19 @@ public:
 
         }
 
+        /**
+         * @brief Initializer constructor.
+         * @param name Function name.
+         * Will be used in parsing.
+         * @param numberOfArguments Number of used arguments for
+         * validation.
+         * @param priority Function priority.
+         * @param function Pointer to function.
+         */
         Function(std::string name,
                  uint32_t numberOfArguments,
                  std::size_t priority,
-                 double (*function)(ArgumentsStack&)
+                 NumberType (*function)(ArgumentsStack&)
         ) :
             name(std::move(name)),
             numberOfArguments(numberOfArguments),
@@ -120,6 +136,9 @@ public:
 
         }
 
+        /**
+         * @brief Move constructor.
+         */
         Function(Function&& mv) noexcept :
             name(std::move(mv.name)),
             numberOfArguments(mv.numberOfArguments),
@@ -129,6 +148,9 @@ public:
 
         }
 
+        /**
+         * @brief Move operator.
+         */
         Function& operator=(Function&& mv) noexcept
         {
             name = std::move(mv.name);
@@ -139,6 +161,10 @@ public:
             return *this;
         }
 
+
+        /**
+         * @brief Copy operator.
+         */
         Function& operator=(const Function& mv)
         {
             name = mv.name;
@@ -149,14 +175,29 @@ public:
             return (*this);
         }
 
+        // Function name
         std::string name;
+
+        // Number of arguments for function.
+        // Using in validation stage.
         uint32_t numberOfArguments;
+
+        // Function priority.
         std::size_t priority;
-        double (*function)(ArgumentsStack&);
+
+        // Pointer to function implementation.
+        NumberType (*function)(ArgumentsStack&);
     };
 
     /**
      * @brief Constructor.
+     * Default functions:
+     * `+` - add
+     * `-` - substract
+     * `*` - multiply
+     * `/` - divide
+     * `^` - power
+     * `!` - factorial
      */
     Calculator();
 
@@ -182,24 +223,31 @@ public:
      * Can throw CalculationException on any error.
      * @return Execution result.
      */
-    double execute();
+    NumberType execute();
 
     /**
      * @brief Method for adding basic functions.
      *
      * Functions list:
-     * `+` - add
-     * `-` - substract
-     * `*` - multiply
-     * `/` - divide
-     * `^` - power
-     * `!` - factorial
-     * `&` - binary and
-     * `|` - binary or
-     * `%` - module
-     * `abs` - absolute value
-     * `sin` - sinus
-     * `cos` - cosinus
+     * `&` - binary AND.
+     * `|` - binary OR.
+     * `%` - module.
+     * `abs` - absolute value.
+     * `sin` - sine.
+     * `cos` - cosine.
+     * `tan` - tangent.
+     * `acos` - arc cosine.
+     * `asin` - arc sine.
+     * `atan` - arc tangent.
+     * `atan2` - arc tangent with 2 params.
+     * `cosh` - hyperbolic cosine.
+     * `sinh` - hyperbolic sine.
+     * `tanh` - hyperbolic tangent.
+     * `log` - natural logarithm.
+     * `log10` - common logarithm,
+     * `sqrt` - square root.
+     * `ceil` - round up value.
+     * `floor` - round down value.
      */
     void addBasicFunctions();
 
@@ -215,7 +263,8 @@ public:
      * @brief Method for adding default constants.
      *
      * Constants list:
-     * `PI` -
+     * `PI` - Pi value.
+     * `e` - exponent value.
      */
     void addConstants();
 
@@ -225,7 +274,7 @@ public:
      * @param name Variable name.
      * @param value Variable value.
      */
-    void setVariable(std::string name, double value);
+    void setVariable(std::string name, NumberType value);
 
     /**
      * @brief Method for adding constant value.
@@ -234,7 +283,7 @@ public:
      * @param name Constant name.
      * @param value Constant variable.
      */
-    void addConstant(std::string name, double value);
+    void addConstant(std::string name, NumberType value);
 
     /**
      * @brief Method for deleting variable name.
@@ -279,15 +328,27 @@ private:
     // Optimization
     void performOptimization();
 
+    // Functions by hashes.
     std::map<std::size_t, Function> m_functions;
-    std::map<std::size_t, double> m_variables;
-    std::map<std::size_t, double> m_constants;
+
+    // Variable values by hashes.
+    std::map<std::size_t, NumberType> m_variables;
+
+    // Constant values by hashes.
+    std::map<std::size_t, NumberType> m_constants;
+
+    // Container with parsed expression in revese
+    // polish notation.
     LexemStack m_expression;
 
+    // Internal brace counter, that's used in
+    // lexem states.
     int m_braceTest;
 
+    // Arguments stack buffer. Used in execution.
     ArgumentsStack m_executionStack;
 
+    // Hash calculator for strings.
     std::hash<std::string_view> m_stringHash;
 };
 

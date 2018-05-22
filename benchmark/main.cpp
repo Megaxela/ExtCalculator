@@ -110,23 +110,23 @@ static void compilationOptimization(benchmark::State& s)
 
 
 BENCHMARK(libExecSpeed)
-    ->Range(1, 1U << 20)
+    ->Range(1, 1U << 20U)
     ->Complexity();
 
 BENCHMARK(tinyexprExecSpeed)
-    ->Range(1, 1U << 20)
+    ->Range(1, 1U << 20U)
     ->Complexity();
 
 BENCHMARK(nativeExecSpeed)
-    ->Range(1, 1U << 20)
+    ->Range(1, 1U << 20U)
     ->Complexity();
 
 BENCHMARK(compilationNoOptimization)
-    ->Range(1, 1U << 20)
+    ->Range(1, 1U << 20U)
     ->Complexity();
 
 BENCHMARK(compilationOptimization)
-    ->Range(1, 1U << 20)
+    ->Range(1, 1U << 20U)
     ->Complexity();
 
 BENCHMARK_MAIN();
